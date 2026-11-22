@@ -1,0 +1,6 @@
+build-fx/
+build-cg/
+*.obj
+*.o
+*.bin
+*.abs
