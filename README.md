@@ -37,12 +37,13 @@ Add-in en C (usando **gint** y **fxSDK**) para graficar funciones matemáticas c
 
 ### 2. Pantalla de graficación animada
 - `F1` o `EXE`: Pausar / Reanudar animación
-- `F2` / `F3`: Disminuir / Aumentar velocidad (`dt`). Cuando está en pausa, retrocede o avanza `t` paso a paso
+- `F2` / `F3`: Disminuir / Aumentar velocidad (`dt`). Cuando está en pausa, retrocede o avanza `t` paso a paso (mantener presionado >1 s para avance continuo)
 - `F4`: Cambiar modo de bucle (`LOOP` / `BNC` / `FREE`)
 - `F5`: Reiniciar `t = Tmin`
 - `F6`: Abrir configuración de ventana y tiempo
 - Flechas (`▲` `▼` `◀` `▶`): Desplazar la vista
-- `+` / `-`: Acercar / Alejar zoom
+- `X,θ,T`: Cambiar el eje de zoom (`Z:XY` ambos, `Z:X` solo X, `Z:Y` solo Y), mostrado en la barra superior
+- `+` / `-`: Acercar / Alejar zoom (mantener presionado >1 s para zoom continuo)
 - `OPTN` / `VARS`: Ocultar o mostrar la barra de estado (HUD)
 - `EXIT`: Volver al editor
 

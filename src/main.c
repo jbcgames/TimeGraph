@@ -373,6 +373,22 @@ static void run_config_screen(GraphConfig *cfg)
     }
 }
 
+typedef enum {
+    ZOOM_XY = 0,
+    ZOOM_X  = 1,
+    ZOOM_Y  = 2
+} ZoomAxis;
+
+static const char *zoom_axis_short(ZoomAxis z)
+{
+    switch (z) {
+        case ZOOM_XY: return "XY";
+        case ZOOM_X:  return "X";
+        case ZOOM_Y:  return "Y";
+    }
+    return "XY";
+}
+
 /* ---------- Animated Graph Screen ---------- */
 static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
 {
@@ -380,6 +396,7 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
     float dir = 1.0f;
     bool paused = false;
     bool show_hud = true;
+    ZoomAxis zoom_axis = ZOOM_XY;
 
     int held_key = 0;
     uint32_t hold_start_tick = 0;
@@ -450,10 +467,10 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
             char t_str[16];
             fmt_float(t_str, sizeof(t_str), t, 2);
             drect(0, 0, 127, 8, C_BLACK);
-            dprint(2, 1, C_WHITE, "t=%s %s %s",
+            dprint(2, 1, C_WHITE, "t=%s %s Z:%s",
                    t_str,
                    paused ? "PAUSA" : loop_mode_short(cfg->mode),
-                   prog->uses_t ? "" : "(est)");
+                   zoom_axis_short(zoom_axis));
             draw_fkeys(paused ? "PLAY" : "PAUS",
                        paused ? "<t" : "v-",
                        paused ? "t>" : "v+",
@@ -507,6 +524,8 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 last_tick = rtc_ticks();
             } else if (ev.key == KEY_OPTN || ev.key == KEY_VARS) {
                 show_hud = !show_hud;
+            } else if (ev.key == KEY_XOT) {
+                zoom_axis = (ZoomAxis)(((int)zoom_axis + 1) % 3);
             } else if (ev.key == KEY_LEFT) {
                 float shift = x_span * 0.1f;
                 cfg->xmin -= shift; cfg->xmax -= shift;
@@ -521,22 +540,30 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 cfg->ymin -= shift; cfg->ymax -= shift;
             } else if (ev.key == KEY_ADD) {
                 /* Zoom in */
-                float cx = 0.5f * (cfg->xmin + cfg->xmax);
-                float cy = 0.5f * (cfg->ymin + cfg->ymax);
-                float hx = 0.4f * x_span;
-                float hy = 0.4f * y_span;
-                cfg->xmin = cx - hx; cfg->xmax = cx + hx;
-                cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_X) {
+                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                    float hx = 0.4f * x_span;
+                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                }
+                if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_Y) {
+                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                    float hy = 0.4f * y_span;
+                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                }
                 held_key = KEY_ADD;
                 hold_start_tick = rtc_ticks();
             } else if (ev.key == KEY_SUB) {
                 /* Zoom out */
-                float cx = 0.5f * (cfg->xmin + cfg->xmax);
-                float cy = 0.5f * (cfg->ymin + cfg->ymax);
-                float hx = 0.625f * x_span;
-                float hy = 0.625f * y_span;
-                cfg->xmin = cx - hx; cfg->xmax = cx + hx;
-                cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_X) {
+                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                    float hx = 0.625f * x_span;
+                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                }
+                if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_Y) {
+                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                    float hy = 0.625f * y_span;
+                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                }
                 held_key = KEY_SUB;
                 hold_start_tick = rtc_ticks();
             }
@@ -552,23 +579,31 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 } else if (held_key == KEY_F3 && paused) {
                     t += cfg->dt;
                 } else if (held_key == KEY_ADD) {
-                    float cur_xspan = cfg->xmax - cfg->xmin;
-                    float cur_yspan = cfg->ymax - cfg->ymin;
-                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
-                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
-                    float hx = 0.46f * cur_xspan;
-                    float hy = 0.46f * cur_yspan;
-                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
-                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                    if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_X) {
+                        float cur_xspan = cfg->xmax - cfg->xmin;
+                        float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                        float hx = 0.46f * cur_xspan;
+                        cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                    }
+                    if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_Y) {
+                        float cur_yspan = cfg->ymax - cfg->ymin;
+                        float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                        float hy = 0.46f * cur_yspan;
+                        cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                    }
                 } else if (held_key == KEY_SUB) {
-                    float cur_xspan = cfg->xmax - cfg->xmin;
-                    float cur_yspan = cfg->ymax - cfg->ymin;
-                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
-                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
-                    float hx = 0.54f * cur_xspan;
-                    float hy = 0.54f * cur_yspan;
-                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
-                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                    if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_X) {
+                        float cur_xspan = cfg->xmax - cfg->xmin;
+                        float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                        float hx = 0.54f * cur_xspan;
+                        cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                    }
+                    if (zoom_axis == ZOOM_XY || zoom_axis == ZOOM_Y) {
+                        float cur_yspan = cfg->ymax - cfg->ymin;
+                        float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                        float hy = 0.54f * cur_yspan;
+                        cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                    }
                 }
             }
         }
