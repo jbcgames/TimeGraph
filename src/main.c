@@ -381,6 +381,9 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
     bool paused = false;
     bool show_hud = true;
 
+    int held_key = 0;
+    uint32_t hold_start_tick = 0;
+
     clearevents();
     uint32_t last_tick = rtc_ticks();
 
@@ -464,6 +467,10 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
         /* 2. Handle non-blocking keyboard events */
         key_event_t ev;
         while ((ev = pollevent()).type != KEYEV_NONE) {
+            if (ev.type == KEYEV_UP) {
+                if (ev.key == held_key) held_key = 0;
+                continue;
+            }
             if (ev.type != KEYEV_DOWN) continue;
 
             if (ev.key == KEY_EXIT) {
@@ -473,6 +480,8 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
             } else if (ev.key == KEY_F2) {
                 if (paused) {
                     t -= cfg->dt;
+                    held_key = KEY_F2;
+                    hold_start_tick = rtc_ticks();
                 } else {
                     cfg->dt *= 0.75f;
                     if (cfg->dt < 0.01f) cfg->dt = 0.01f;
@@ -480,6 +489,8 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
             } else if (ev.key == KEY_F3) {
                 if (paused) {
                     t += cfg->dt;
+                    held_key = KEY_F3;
+                    hold_start_tick = rtc_ticks();
                 } else {
                     cfg->dt *= 1.33f;
                     if (cfg->dt > 5.0f) cfg->dt = 5.0f;
@@ -490,6 +501,7 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 t = cfg->tmin;
                 dir = 1.0f;
             } else if (ev.key == KEY_F6) {
+                held_key = 0;
                 run_config_screen(cfg);
                 clearevents();
                 last_tick = rtc_ticks();
@@ -515,6 +527,8 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 float hy = 0.4f * y_span;
                 cfg->xmin = cx - hx; cfg->xmax = cx + hx;
                 cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                held_key = KEY_ADD;
+                hold_start_tick = rtc_ticks();
             } else if (ev.key == KEY_SUB) {
                 /* Zoom out */
                 float cx = 0.5f * (cfg->xmin + cfg->xmax);
@@ -523,6 +537,39 @@ static void run_graph_screen(const ExprCompiled *prog, GraphConfig *cfg)
                 float hy = 0.625f * y_span;
                 cfg->xmin = cx - hx; cfg->xmax = cx + hx;
                 cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                held_key = KEY_SUB;
+                hold_start_tick = rtc_ticks();
+            }
+        }
+
+        /* 2b. Continuous repeat after 1 second (128 RTC ticks) of holding F2/F3 (paused) or +/- */
+        if (held_key != 0) {
+            if (!keydown(held_key)) {
+                held_key = 0;
+            } else if ((rtc_ticks() - hold_start_tick) >= 128) {
+                if (held_key == KEY_F2 && paused) {
+                    t -= cfg->dt;
+                } else if (held_key == KEY_F3 && paused) {
+                    t += cfg->dt;
+                } else if (held_key == KEY_ADD) {
+                    float cur_xspan = cfg->xmax - cfg->xmin;
+                    float cur_yspan = cfg->ymax - cfg->ymin;
+                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                    float hx = 0.46f * cur_xspan;
+                    float hy = 0.46f * cur_yspan;
+                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                } else if (held_key == KEY_SUB) {
+                    float cur_xspan = cfg->xmax - cfg->xmin;
+                    float cur_yspan = cfg->ymax - cfg->ymin;
+                    float cx = 0.5f * (cfg->xmin + cfg->xmax);
+                    float cy = 0.5f * (cfg->ymin + cfg->ymax);
+                    float hx = 0.54f * cur_xspan;
+                    float hy = 0.54f * cur_yspan;
+                    cfg->xmin = cx - hx; cfg->xmax = cx + hx;
+                    cfg->ymin = cy - hy; cfg->ymax = cy + hy;
+                }
             }
         }
 
